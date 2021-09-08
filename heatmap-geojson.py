@@ -24,6 +24,7 @@ import re
 import glob
 import argparse
 import geopy.distance
+import math
 
 
 def get_gpx_files(args):
@@ -42,16 +43,20 @@ def distance(point1, point2):
 	#using great_circle because its fast, and accuracy matters not here
 	return geopy.distance.great_circle(point1, point2).m
 
-def add_points(output_file, points, count, round_digits):
+def binning(number, bin_size):
+	return round(number/bin_size)*bin_size
+
+def add_points(output_file, points, count, bin_size):
 	print('{"type":"Feature","properties":{"count":%d},"geometry":{"type":"MultiPoint","coordinates":[' % count, file=output_file)
 	first=True
+	round_value = max(math.ceil(-math.log10(bin_size)+1),0)
 	for point in points:
 		print(
-			'{comma}[{longitude:.{round}f},{latitude:.{round}f}]'.format(
+			'{comma}[{longitude:.{round_value}f},{latitude:.{round_value}f}]'.format(
 			comma='' if first else ',', end='',
 			latitude=point[0],
 			longitude=point[1],
-			round=round_digits),
+			round_value=round_value),
 		file=output_file, end='')
 		first=False
 	print('', file=output_file)
@@ -71,7 +76,7 @@ def main(args):
 				if '<trkpt' in line:
 					r = re.findall('[-]?[0-9]*[.]?[0-9]+', line)
 
-					point = (round(float(r[0]),args.round_digits), round(float(r[1]),args.round_digits))
+					point = (binning(float(r[0]),args.bin_size), binning(float(r[1]),args.bin_size))
 					if point == last_point or last_point is not None and distance(point, last_point) < args.skip_distance:
 						continue
 					last_point = point
@@ -93,7 +98,7 @@ def main(args):
 		for count, points in sorted(heatmap_data_by_count.items()):
 			print('' if first else ',', end='', file=output_file)
 			first=False
-			add_points(output_file, points, count, args.round_digits)
+			add_points(output_file, points, count, args.bin_size)
 		print(']}', file=output_file)
 
 	if not args.quiet:
@@ -106,7 +111,7 @@ if __name__ == '__main__':
 	parser.add_argument('--gpx-filters', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
 	parser.add_argument('--skip-distance', metavar = 'N', type = float, default = 10, help = 'compression: read points that change the position by this distance in meters (default: 10)')
 	parser.add_argument('--max-val', metavar = 'N', type = float, default = 20, help = 'maximum value for a heatmap point (default: 20)')
-	parser.add_argument('--round-digits', metavar = 'N', type = int, default = 5, help = 'how many decimal places to round digits to (default: 5)')
+	parser.add_argument('--bin-size', metavar = 'N', type = int, default = .00015, help = 'compression: put each point into a bin of this size in degrees (default: .00015 degrees)')
 	parser.add_argument('--output', metavar = 'FILE', default = 'heatmap.geojson', help = 'output geojson file (default: heatmap.geojson)')
 	parser.add_argument('--quiet', default = False, action = 'store_true', help = 'quiet output')
 

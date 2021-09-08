@@ -15,7 +15,7 @@ script to produce a heatmap geojson from gpx files
 ### command-line options
 ```
 usage: heatmap-geojson.py [-h] [--gpx-dir DIR] [--gpx-filters FILTERS]
-                          [--skip-distance N] [--max-val N] [--round-digits N]
+                          [--skip-distance N] [--max-val N] [--bin-size N]
                           [--output FILE] [--quiet]
 
 generate a local heatmap geojson from gpx files
@@ -28,8 +28,8 @@ optional arguments:
   --skip-distance N     compression: read points that change the position by
                         this distance in meters (default: 10)
   --max-val N           maximum value for a heatmap point (default: 20)
-  --round-digits N      how many decimal places to round digits to (default:
-                        5)
+  --bin-size N          compression: put each point into a bin of this size in
+                        degrees (default: .00015 degrees)
   --output FILE         output geojson file (default: heatmap.geojson)
   --quiet               quiet output
 
