@@ -62,29 +62,31 @@ def add_points(output_file, points, count, bin_size):
 	print('', file=output_file)
 	print(']}}', file=output_file)
 
+def read_gpx(filename):
+	with open(filename, 'r') as file:
+		for line in file:
+			if '<trkpt' in line:
+				point = re.findall('[-]?[0-9]*[.]?[0-9]+', line)
+				yield point
 
-def main(args):
-	heatmap_data = {}
+def accept_points(heatmap_data, points):
+	last_point = None
+	for point in points:
+		point = (binning(float(point[0]),args.bin_size), binning(float(point[1]),args.bin_size))
+		if point == last_point or last_point is not None and distance(point, last_point) < args.skip_distance:
+			continue
+		last_point = point
+		current_count = heatmap_data[point]+1 if point in heatmap_data else 1
+		heatmap_data[point]=min(current_count, args.max_val)
 
-	for gpx_file in get_gpx_files(args):
+def read_gpx_files(args, heatmap_data):
+	for filename in get_gpx_files(args):
 		if not args.quiet:
-			print('reading {}'.format(gpx_file))
+			print('reading {}'.format(filename))
 
-		with open(gpx_file, 'r') as file:
-			last_point = None
-			for line in file:
-				if '<trkpt' in line:
-					r = re.findall('[-]?[0-9]*[.]?[0-9]+', line)
+		accept_points(heatmap_data, read_gpx(filename))
 
-					point = (binning(float(r[0]),args.bin_size), binning(float(r[1]),args.bin_size))
-					if point == last_point or last_point is not None and distance(point, last_point) < args.skip_distance:
-						continue
-					last_point = point
-					current_count = heatmap_data[point]+1 if point in heatmap_data else 1
-					heatmap_data[point]=min(current_count, args.max_val)
-
-	print('loaded {} trackpoints'.format(len(heatmap_data)))
-	
+def write_geojson_file(args, heatmap_data):
 	#for each count, create a feature
 	heatmap_data_by_count = {}
 	for point, count in heatmap_data.items():
@@ -103,6 +105,15 @@ def main(args):
 
 	if not args.quiet:
 		print('saved {}'.format(args.output))
+
+def main(args):
+	heatmap_data = {}
+
+	read_gpx_files(args, heatmap_data)
+	
+	print('loaded {} trackpoints'.format(len(heatmap_data)))
+
+	write_geojson_file(args, heatmap_data)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = 'generate a local heatmap geojson from gpx files', epilog = 'report issues to github.com/arichnad/heatmap-geojson')
