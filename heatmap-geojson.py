@@ -26,6 +26,7 @@ import argparse
 import geopy.distance
 import math
 
+total_points = 0
 
 def get_gpx_files(args):
 	gpx_filters = args.gpx_filters if args.gpx_filters else ['*.gpx']
@@ -63,10 +64,12 @@ def add_points(output_file, points, count, bin_size):
 	print(']}}', file=output_file)
 
 def read_gpx(filename):
+	global total_points
 	with open(filename, 'r') as file:
 		for line in file:
 			if '<trkpt' in line:
 				point = re.findall('[-]?[0-9]*[.]?[0-9]+', line)
+				total_points += 1
 				yield point
 
 def accept_points(heatmap_data, points):
@@ -111,7 +114,7 @@ def main(args):
 
 	read_gpx_files(args, heatmap_data)
 	
-	print('loaded {} trackpoints'.format(len(heatmap_data)))
+	print('loaded {} trackpoints:  compressed down to {} points at {} different locations'.format(total_points, sum(heatmap_data.values()), len(heatmap_data)))
 
 	write_geojson_file(args, heatmap_data)
 
