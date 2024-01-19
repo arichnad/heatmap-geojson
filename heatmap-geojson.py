@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright (c) 2021
+# Copyright (c) 2021 Contributors
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@ import glob
 import argparse
 import geopy.distance
 import math
+import json
 
 total_points = 0
 
@@ -44,26 +45,28 @@ def distance(point1, point2):
 	#using great_circle because its fast, and accuracy matters not here
 	return geopy.distance.great_circle(point1, point2).m
 
-def binning(number, bin_size):
-	return round(number/bin_size)*bin_size
+def binning(number, bin_size, round_value):
+	return round(round(number/bin_size)*bin_size, round_value)
 
-def add_points(output_file, points, count, bin_size):
-	print('{"type":"Feature","properties":{"count":%d},"geometry":{"type":"MultiPoint","coordinates":[' % count, file=output_file)
-	first=True
-	round_value = max(math.ceil(-math.log10(bin_size)+1),0)
-	for point in points:
-		print(
-			'{comma}[{longitude:.{round_value}f},{latitude:.{round_value}f}]'.format(
-			comma='' if first else ',', end='',
-			latitude=point[0],
-			longitude=point[1],
-			round_value=round_value),
-		file=output_file, end='')
-		first=False
+def add_points(output_file, points, count):
+	#we want to quickly stream these, so the geojson package will not work here
+	json.dump(
+		{
+			'type': 'Feature',
+			'properties': {'count': count},
+			'geometry': {
+				'type': 'MultiPoint',
+				'coordinates': [
+					[point[1], point[0]] for point in points
+				]
+			}
+		},
+		separators=(',',':'),
+		fp=output_file)
 	print('', file=output_file)
-	print(']}}', file=output_file)
 
 def read_gpx(filename):
+	#much faster than gpxpy package
 	global total_points
 	with open(filename, 'r') as file:
 		for line in file:
@@ -74,8 +77,9 @@ def read_gpx(filename):
 
 def accept_points(heatmap_data, points):
 	last_point = None
+	round_value = max(math.ceil(-math.log10(args.bin_size)+1),0)
 	for point in points:
-		point = (binning(float(point[0]),args.bin_size), binning(float(point[1]),args.bin_size))
+		point = (binning(float(point[0]), args.bin_size, round_value), binning(float(point[1]), args.bin_size, round_value))
 		if point == last_point or last_point is not None and distance(point, last_point) < args.skip_distance:
 			continue
 		last_point = point
@@ -103,7 +107,7 @@ def write_geojson_file(args, heatmap_data):
 		for count, points in sorted(heatmap_data_by_count.items()):
 			print('' if first else ',', end='', file=output_file)
 			first=False
-			add_points(output_file, points, count, args.bin_size)
+			add_points(output_file, points, count)
 		print(']}', file=output_file)
 
 	if not args.quiet:
