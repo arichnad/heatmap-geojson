@@ -35,6 +35,10 @@ def get_gpx_files(args):
 
 	for filter in gpx_filters:
 		gpx_files += glob.glob('{}/{}'.format(args.gpx_dir, filter))
+	
+	if args.stdin_filenames:
+		import sys
+		gpx_files += [filename.rstrip() for filename in sys.stdin.readlines()]
 
 	if not gpx_files:
 		exit('error no gpx files found')
@@ -67,6 +71,7 @@ def add_points(output_file, points, count):
 
 def read_gpx(filename):
 	#much faster than gpxpy package
+	#assumes an awful lot about the newlines in the file, but also ignores track and segment boundaries
 	global total_points
 	with open(filename, 'r') as file:
 		for line in file:
@@ -127,6 +132,7 @@ if __name__ == '__main__':
 
 	parser.add_argument('--gpx-dir', metavar = 'DIR', default = 'gpx', help = 'directory containing the gpx files (default: gpx)')
 	parser.add_argument('--gpx-filters', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
+	parser.add_argument('--stdin-filenames', default = False, action = 'store_true', help = 'if this is true, filenames are read from stdin.  newline is the delimiter for filenames.')
 	parser.add_argument('--skip-distance', metavar = 'N', type = float, default = 10, help = 'compression: read points that change the position by this distance in meters (default: 10)')
 	parser.add_argument('--max-val', metavar = 'N', type = float, default = 20, help = 'maximum value for a heatmap point (default: 20)')
 	parser.add_argument('--bin-size', metavar = 'N', type = int, default = .00015, help = 'compression: put each point into a bin of this size in degrees (default: .00015 degrees)')
