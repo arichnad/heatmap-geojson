@@ -33,8 +33,9 @@ def get_gpx_files(args):
 	gpx_filters = args.gpx_filters if args.gpx_filters else ['*.gpx']
 	gpx_files = []
 
-	for filter in gpx_filters:
-		gpx_files += glob.glob('{}/{}'.format(args.gpx_dir, filter))
+	for dir in args.gpx_dir:
+		for filter in gpx_filters:
+			gpx_files += glob.glob('{}/{}'.format(dir, filter))
 	
 	if args.stdin_filenames:
 		import sys
@@ -130,7 +131,7 @@ def main(args):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = 'generate a local heatmap geojson from gpx files', epilog = 'report issues to github.com/arichnad/heatmap-geojson')
 
-	parser.add_argument('--gpx-dir', metavar = 'DIR', default = 'gpx', help = 'directory containing the gpx files (default: gpx)')
+	parser.add_argument('--gpx-dir', metavar = 'DIR', action = 'append', default = ['gpx'], help = 'directory containing the gpx files (default: gpx)')
 	parser.add_argument('--gpx-filters', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
 	parser.add_argument('--stdin-filenames', default = False, action = 'store_true', help = 'if this is true, filenames are read from stdin.  newline is the delimiter for filenames.')
 	parser.add_argument('--skip-distance', metavar = 'N', type = float, default = 10, help = 'compression: read points that change the position by this distance in meters (default: 10)')
