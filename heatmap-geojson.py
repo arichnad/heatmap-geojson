@@ -81,7 +81,7 @@ def read_gpx(filename):
 				total_points += 1
 				yield point
 
-def accept_points(heatmap_data, points):
+def accept_points(args, heatmap_data, points):
 	last_point = None
 	round_value = max(math.ceil(-math.log10(args.bin_size)+1),0)
 	for point in points:
@@ -97,7 +97,7 @@ def read_gpx_files(args, heatmap_data):
 		if not args.quiet:
 			print('reading {}'.format(filename))
 
-		accept_points(heatmap_data, read_gpx(filename))
+		accept_points(args, heatmap_data, read_gpx(filename))
 
 def write_geojson_file(args, heatmap_data):
 	#for each count, create a feature
