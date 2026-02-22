@@ -30,21 +30,32 @@ import json
 total_points = 0
 
 def get_gpx_files(args):
-	gpx_filters = args.gpx_filters if args.gpx_filters else ['*.gpx']
+	gpx_filter = args.gpx_filter if args.gpx_filter else ['*.gpx']
+	gpx_filter_remove = args.gpx_filter_remove if args.gpx_filter_remove else []
 	gpx_files = []
+	gpx_files_remove = []
 
 	for dir in args.gpx_dir:
-		for filter in gpx_filters:
+		for filter in gpx_filter:
 			gpx_files += glob.glob('{}/{}'.format(dir, filter))
+		for filter in gpx_filter_remove:
+			files_to_remove = glob.glob('{}/{}'.format(dir, filter))
+			for gpx_file_remove in files_to_remove:
+				if gpx_file_remove in gpx_files:
+					gpx_files.remove(gpx_file_remove)
+			gpx_files_remove += files_to_remove
 	
 	if args.stdin_filenames:
 		import sys
 		gpx_files += [filename.rstrip() for filename in sys.stdin.readlines()]
+	
 
+	print('gpx files', len(gpx_files), 'gpx files remove', len(gpx_files_remove))
+			
 	if not gpx_files:
 		exit('error no gpx files found')
 
-	return gpx_files
+	return (gpx_files, gpx_files_remove)
 
 def distance(point1, point2):
 	#using great_circle because its fast, and accuracy matters not here
@@ -92,12 +103,45 @@ def accept_points(args, heatmap_data, points):
 		current_count = heatmap_data[point]+1 if point in heatmap_data else 1
 		heatmap_data[point]=min(current_count, args.max_val)
 
+def remove_points(args, heatmap_data, points):
+	last_point = None
+	round_value = max(math.ceil(-math.log10(args.bin_size)+1),0)
+	for point in points:
+		point = (binning(float(point[0]), args.bin_size, round_value), binning(float(point[1]), args.bin_size, round_value))
+		#removing these lines of code makes the method slightly slower:
+		if point == last_point or last_point is not None and distance(point, last_point) < args.skip_distance:
+			continue
+		last_point = point
+		remove_point(args, heatmap_data, point)
+
+def remove_point(args, heatmap_data, point):
+	if point in heatmap_data:
+		del heatmap_data[point]
+	
+	#remove things NEAR point as well!
+	for dx in [-1, 0, 1]:
+		for dy in [-1, 0, 1]:
+			if dx==0 and dy==0: continue
+			for distance in range(1,3):
+				nearby_point = (point[0]+dx*distance*args.bin_size, point[1]+dy*distance*args.bin_size)
+				#nearby_point = (binning(nearby_point[0], args.bin_size, round_value), binning(nearby_point[1], args.bin_size, round_value))
+				if nearby_point in heatmap_data:
+					del heatmap_data[nearby_point]
+
+
 def read_gpx_files(args, heatmap_data):
-	for filename in get_gpx_files(args):
+	(filenames, remove_filenames) = get_gpx_files(args)
+	for filename in filenames:
 		if not args.quiet:
 			print('reading {}'.format(filename))
 
 		accept_points(args, heatmap_data, read_gpx(filename))
+	
+	for filename in remove_filenames:
+		if not args.quiet:
+			print('remove {}'.format(filename))
+
+		remove_points(args, heatmap_data, read_gpx(filename))
 
 def write_geojson_file(args, heatmap_data):
 	#for each count, create a feature
@@ -132,7 +176,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = 'generate a local heatmap geojson from gpx files', epilog = 'report issues to github.com/arichnad/heatmap-geojson')
 
 	parser.add_argument('--gpx-dir', metavar = 'DIR', action = 'append', default = ['gpx'], help = 'directory containing the gpx files (default: gpx)')
-	parser.add_argument('--gpx-filters', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
+	parser.add_argument('--gpx-filter', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
+	parser.add_argument('--gpx-filter-remove', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (nothing)')
 	parser.add_argument('--stdin-filenames', default = False, action = 'store_true', help = 'if this is true, filenames are read from stdin.  newline is the delimiter for filenames.')
 	parser.add_argument('--skip-distance', metavar = 'N', type = float, default = 10, help = 'compression: read points that change the position by this distance in meters (default: 10)')
 	parser.add_argument('--max-val', metavar = 'N', type = float, default = 20, help = 'maximum value for a heatmap point (default: 20)')
