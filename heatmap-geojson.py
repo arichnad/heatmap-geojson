@@ -115,18 +115,15 @@ def remove_points(args, heatmap_data, points):
 		remove_point(args, heatmap_data, point)
 
 def remove_point(args, heatmap_data, point):
-	if point in heatmap_data:
-		del heatmap_data[point]
-	
+	remove_padding_squared = args.remove_padding*args.remove_padding
 	#remove things NEAR point as well!
-	for dx in [-1, 0, 1]:
-		for dy in [-1, 0, 1]:
-			if dx==0 and dy==0: continue
-			for distance in range(1,3):
-				nearby_point = (point[0]+dx*distance*args.bin_size, point[1]+dy*distance*args.bin_size)
-				#nearby_point = (binning(nearby_point[0], args.bin_size, round_value), binning(nearby_point[1], args.bin_size, round_value))
-				if nearby_point in heatmap_data:
-					del heatmap_data[nearby_point]
+	for dx in range(-args.remove_padding, args.remove_padding+1):
+		for dy in range(-args.remove_padding, args.remove_padding+1):
+			if dx*dx+dy+dy>remove_padding_squared: continue #only check the circle around the point
+			nearby_point = (point[0]+dx*args.bin_size, point[1]+dy*args.bin_size)
+			#nearby_point = (binning(nearby_point[0], args.bin_size, round_value), binning(nearby_point[1], args.bin_size, round_value))
+			if nearby_point in heatmap_data:
+				del heatmap_data[nearby_point]
 
 
 def read_gpx_files(args, heatmap_data):
@@ -177,11 +174,12 @@ if __name__ == '__main__':
 
 	parser.add_argument('--gpx-dir', metavar = 'DIR', action = 'append', default = ['gpx'], help = 'directory containing the gpx files (default: gpx)')
 	parser.add_argument('--gpx-filter', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default: *.gpx)')
-	parser.add_argument('--gpx-filter-remove', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (nothing)')
+	parser.add_argument('--gpx-filter-remove', metavar = 'FILTERS', action = 'append', help = 'glob filter(s) for the gpx files (default:  nothing removed)')
+	parser.add_argument('--remove-padding', metavar = 'PADDING', type = int, default = 3, help = 'how much padding when removing gpx files (default: 3 bins)')
 	parser.add_argument('--stdin-filenames', default = False, action = 'store_true', help = 'if this is true, filenames are read from stdin.  newline is the delimiter for filenames.')
 	parser.add_argument('--skip-distance', metavar = 'N', type = float, default = 10, help = 'compression: read points that change the position by this distance in meters (default: 10)')
 	parser.add_argument('--max-val', metavar = 'N', type = float, default = 20, help = 'maximum value for a heatmap point (default: 20)')
-	parser.add_argument('--bin-size', metavar = 'N', type = int, default = .00015, help = 'compression: put each point into a bin of this size in degrees (default: .00015 degrees)')
+	parser.add_argument('--bin-size', metavar = 'N', type = float, default = .00015, help = 'compression: put each point into a bin of this size in degrees (default: .00015 degrees)')
 	parser.add_argument('--output', metavar = 'FILE', default = 'heatmap.geojson', help = 'output geojson file (default: heatmap.geojson)')
 	parser.add_argument('--quiet', default = False, action = 'store_true', help = 'quiet output')
 
